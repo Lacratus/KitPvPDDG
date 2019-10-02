@@ -1,3 +1,8 @@
 name: KitPvPPlugin
 version: 1.0
 main: be.live.jonas2000.KitPvPPlugin.Main
+commands:
+  setLocation:
+    description: hoi
+  setSpawn:
+    description: hoi

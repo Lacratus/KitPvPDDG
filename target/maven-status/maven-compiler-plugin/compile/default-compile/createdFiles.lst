@@ -1,1 +1,8 @@
+be\live\jonas2000\KitPvPPlugin\files\LocationFile.class
+be\live\jonas2000\KitPvPPlugin\files\TempStatisticsFile.class
+be\live\jonas2000\KitPvPPlugin\listeners\PlayerListener$1.class
+be\live\jonas2000\KitPvPPlugin\listeners\PlayerListener.class
+be\live\jonas2000\KitPvPPlugin\commands\SetSpawnCommand.class
+be\live\jonas2000\KitPvPPlugin\commands\SetWarpCommand.class
+be\live\jonas2000\KitPvPPlugin\listeners\PlayerListener$2.class
 be\live\jonas2000\KitPvPPlugin\Main.class
