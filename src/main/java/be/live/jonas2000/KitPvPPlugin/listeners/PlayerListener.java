@@ -85,41 +85,43 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onDeath(PlayerDeathEvent e) throws SQLException {
-        Player player = e.getEntity();
-        Player killer = e.getEntity().getKiller();
-        String pUUID = player.getUniqueId().toString();
-        String kUUID = killer.getUniqueId().toString();
+            Player player = e.getEntity();
+            Player killer = e.getEntity().getKiller();
+            if(killer instanceof Player && killer != null) {
+                String pUUID = player.getUniqueId().toString();
+                String kUUID = killer.getUniqueId().toString();
 
-        int deathsPlayer = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + pUUID + ".Deaths");
-        int killsKiller = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + kUUID + ".Kills");
-        int coinsKiller = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + kUUID + ".Coins");
+                int deathsPlayer = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + pUUID + ".Deaths");
+                int killsKiller = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + kUUID + ".Kills");
+                int coinsKiller = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + kUUID + ".Coins");
 
-        TempStatisticsFile.getTempStatisticsFile().set("Players." + pUUID +".Deaths", deathsPlayer +1);
-        TempStatisticsFile.getTempStatisticsFile().set("Players." + kUUID +".Kills", killsKiller +1);
-        TempStatisticsFile.getTempStatisticsFile().set("Players." + kUUID +".Coins", coinsKiller +10);
-        TempStatisticsFile.save();
+                TempStatisticsFile.getTempStatisticsFile().set("Players." + pUUID + ".Deaths", deathsPlayer + 1);
+                TempStatisticsFile.getTempStatisticsFile().set("Players." + kUUID + ".Kills", killsKiller + 1);
+                TempStatisticsFile.getTempStatisticsFile().set("Players." + kUUID + ".Coins", coinsKiller + 10);
+                TempStatisticsFile.save();
 
 
-        killer.sendMessage("You've earned 10 gold");
-
-        Main.updateSidebar(player,"Death");
-        Main.updateSidebar(killer,"Kill");
+                killer.sendMessage("You've earned 10 gold");
+                player.sendMessage("You have been killed by " + player.getKiller());
+                Main.updateSidebar(player, "Death");
+                Main.updateSidebar(killer, "Kill");
+            }
 
     }
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent e) {
-        final World kitPvP = Bukkit.getWorld(LocationFile.getLocationFile().getString("Spawn.WorldName"));
+        final World kitPvP = Bukkit.getWorld(LocationFile.getLocationFile().getString("Locations.Spawn.WorldName"));
         final Player player = e.getPlayer();
         player.getInventory().setItem(4, new ItemStack(Material.COMPASS));
         Bukkit.getServer().getScheduler().scheduleAsyncDelayedTask(Main.getPlugin(), new Runnable() {
             public void run() {
                 player.teleport(new Location(kitPvP
-                        , LocationFile.getLocationFile().getDouble("Spawn.X")
-                        , LocationFile.getLocationFile().getDouble("Spawn.Y")
-                        , LocationFile.getLocationFile().getDouble("Spawn.Z")
-                        ,(float) LocationFile.getLocationFile().getDouble("Spawn.Yaw")
-                        ,(float) LocationFile.getLocationFile().getDouble("Spawn.Pitch")));
+                        , LocationFile.getLocationFile().getDouble("Locations.Spawn.X")
+                        , LocationFile.getLocationFile().getDouble("Locations.Spawn.Y")
+                        , LocationFile.getLocationFile().getDouble("Locations.Spawn.Z")
+                        ,(float) LocationFile.getLocationFile().getDouble("Locations.Spawn.Yaw")
+                        ,(float) LocationFile.getLocationFile().getDouble("Locations.Spawn.Pitch")));
             }
         }, 10L);
     }
