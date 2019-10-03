@@ -10,15 +10,19 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
-import be.live.jonas2000.KitPvPPlugin.commands.SetSpawnCommand;
-import be.live.jonas2000.KitPvPPlugin.commands.SetWarpCommand;
+import be.live.jonas2000.KitPvPPlugin.commands.ModeratorCommand;
 import be.live.jonas2000.KitPvPPlugin.files.LocationFile;
 import be.live.jonas2000.KitPvPPlugin.files.TempStatisticsFile;
 import be.live.jonas2000.KitPvPPlugin.listeners.PlayerListener;
+import be.live.jonas2000.KitPvPPlugin.tabcompleter.modTabCompleter;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -35,14 +39,17 @@ public class Main extends JavaPlugin {
     private String password;
     private int port;
     private static Main plugin;
+
     public Main() {
     }
+
     @Override
     public void onEnable() {
         plugin = this;
         Bukkit.getPluginManager().registerEvents(new PlayerListener(), this);
-        getCommand("setLocation").setExecutor(new SetWarpCommand());
-        getCommand("setSpawn").setExecutor(new SetSpawnCommand());
+        getCommand("mod").setExecutor(new ModeratorCommand());
+        getCommand("mod").setTabCompleter(new modTabCompleter());
+        getCommand("moderator").setExecutor(new ModeratorCommand());
         this.host = "localhost";
         this.port = 3306;
         this.database = "kitpvpddg";
@@ -63,8 +70,18 @@ public class Main extends JavaPlugin {
         //LocationFile Creation
         LocationFile.create();
         LocationFile.getLocationFile().options().copyDefaults(true);
-        TempStatisticsFile.save();
-
+        LocationFile.save();
+        //Default Spawn Creation
+        if(!LocationFile.getLocationFile().contains("Locations.Spawn")) {
+            List<String> worlds = new ArrayList<>(Arrays.asList(Bukkit.getWorlds().toString()));
+            LocationFile.getLocationFile().set("Locations.Spawn.X", 0);
+            LocationFile.getLocationFile().set("Locations.Spawn.Y", 100);
+            LocationFile.getLocationFile().set("Locations.Spawn.Z", 0);
+            LocationFile.getLocationFile().set("Locations.Spawn.Yaw", 0);
+            LocationFile.getLocationFile().set("Locations.Spawn.Pitch", 0);
+            LocationFile.getLocationFile().set("Locations.Spawn.WorldName", worlds.get(0));
+            LocationFile.save();
+        }
 
     }
 
@@ -103,7 +120,7 @@ public class Main extends JavaPlugin {
         ResultSet killSet = prepareStatement("SELECT KILLS FROM player_info WHERE UUID = '" + UUID + "';").executeQuery();
         killSet.next();
         int kill = killSet.getInt("KILLS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".KILLS");
-        Score kills = obj.getScore("Kills: " + kill );
+        Score kills = obj.getScore("Kills: " + kill);
         kills.setScore(9);
         ResultSet deathSet = prepareStatement("SELECT DEATHS FROM player_info WHERE UUID = '" + UUID + "';").executeQuery();
         deathSet.next();
@@ -115,12 +132,12 @@ public class Main extends JavaPlugin {
         int coin = coinSet.getInt("COINS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".COINS");
         Score coins = obj.getScore("Coins: " + coin);
         coins.setScore(5);
-        if(death == 0 ){
+        if (death == 0) {
             ratio = kill;
             Score rat = obj.getScore("Ratio: " + ratio);
             rat.setScore(3);
-        }else {
-            ratio =  (double) kill / death;
+        } else {
+            ratio = (double) kill / death;
             ratioRoundUp = (double) Math.round(ratio * 100) / 100;
             Score rat = obj.getScore("Ratio: " + ratioRoundUp);
             rat.setScore(3);
@@ -144,23 +161,23 @@ public class Main extends JavaPlugin {
         coinSet.next();
         // Bekijken variabelen
         int kill = killSet.getInt("KILLS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Kills");
-        int possibleOldKills = kill-1;
+        int possibleOldKills = kill - 1;
         int death = deathSet.getInt("DEATHS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Deaths");
-        int possibleOldDeaths= death-1;
+        int possibleOldDeaths = death - 1;
         int coins = coinSet.getInt("COINS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Coins");
-        if(death == 0){
+        if (death == 0) {
             newRatio = kill;
         } else {
             newRatio = (double) kill / death;
-            newRatioRoundUp = (double) Math.round(newRatio*100) / 100 ;
+            newRatioRoundUp = (double) Math.round(newRatio * 100) / 100;
         }
         //reset Ratio
-        if(killDeathDisconnectRestart.equals("Kill")){
-            oldRatio = (double) (kill-1)/death;
+        if (killDeathDisconnectRestart.equals("Kill")) {
+            oldRatio = (double) (kill - 1) / death;
             double oldRatioRoundUp = (double) Math.round(oldRatio * 100) / 100;
             player.getScoreboard().resetScores("Ratio: " + oldRatioRoundUp);
-        } else if(killDeathDisconnectRestart.equals("Death")){
-            oldRatio = (double) kill/(death-1);
+        } else if (killDeathDisconnectRestart.equals("Death")) {
+            oldRatio = (double) kill / (death - 1);
             double oldRatioRoundUp = (double) Math.round(oldRatio * 100) / 100;
             player.getScoreboard().resetScores("Ratio: " + oldRatioRoundUp);
         }
@@ -177,26 +194,26 @@ public class Main extends JavaPlugin {
 
 
     @Override
-    public void onDisable(){
+    public void onDisable() {
         ConfigurationSection sec = TempStatisticsFile.getTempStatisticsFile().getConfigurationSection("Players");
-        for(String stringUUID : sec.getKeys(false)){
+        for (String stringUUID : sec.getKeys(false)) {
             int kills = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + stringUUID + ".Kills");
             int deaths = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + stringUUID + ".Deaths");
 
             try {
                 Main.prepareStatement("UPDATE player_info SET DEATHS = DEATHS + "
                         + TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Deaths")
-                        +",KILLS = KILLS + "
-                        +TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Kills")
-                        +",COINS = COINS + "
-                        +TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Coins")
-                        +" WHERE UUID = '"+ stringUUID + "';").executeUpdate();
-                Main.updateSidebar(Bukkit.getPlayer(UUID.fromString(stringUUID)),"Restart");
+                        + ",KILLS = KILLS + "
+                        + TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Kills")
+                        + ",COINS = COINS + "
+                        + TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Coins")
+                        + " WHERE UUID = '" + stringUUID + "';").executeUpdate();
+                Main.updateSidebar(Bukkit.getPlayer(UUID.fromString(stringUUID)), "Restart");
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
         }
         TempStatisticsFile.getFile().delete();
     }
-    }
+}
 
