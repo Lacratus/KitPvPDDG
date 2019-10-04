@@ -7,13 +7,13 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 
-public class TempStatisticsFile {
+public class SelectedKitFile {
 
     private static File file;
-    private static FileConfiguration tempStatisticsFile;
+    private static FileConfiguration selectedKitFile;
 
     public static void create() {
-        file = new File(Bukkit.getServer().getPluginManager().getPlugin("KitPvPPlugin").getDataFolder(), "TempStatistics.yml");
+        file = new File(Bukkit.getServer().getPluginManager().getPlugin("KitPvPPlugin").getDataFolder(), "SelectedKit.yml");
 
         try {
             if (!file.exists()) {
@@ -23,11 +23,11 @@ public class TempStatisticsFile {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        tempStatisticsFile = YamlConfiguration.loadConfiguration(file);
+        selectedKitFile = YamlConfiguration.loadConfiguration(file);
     }
 
-    public static FileConfiguration getTempStatisticsFile() {
-        return tempStatisticsFile;
+    public static FileConfiguration getSelectedKitFile() {
+        return selectedKitFile;
     }
 
     public static File getFile() {
@@ -36,7 +36,7 @@ public class TempStatisticsFile {
 
     public static void save() {
         try {
-            tempStatisticsFile.save(file);
+           selectedKitFile.save(file);
         } catch (IOException e) {
             System.out.println("Opslaan is niet gelukt");
         }

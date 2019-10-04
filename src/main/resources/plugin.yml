@@ -4,3 +4,5 @@ main: be.live.jonas2000.KitPvPPlugin.Main
 commands:
   mod:
   moderator:
+  spawn:
+

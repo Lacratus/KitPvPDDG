@@ -16,13 +16,15 @@ import java.util.List;
 import java.util.UUID;
 
 import be.live.jonas2000.KitPvPPlugin.commands.ModeratorCommand;
+import be.live.jonas2000.KitPvPPlugin.commands.SpawnCommand;
 import be.live.jonas2000.KitPvPPlugin.files.LocationFile;
+import be.live.jonas2000.KitPvPPlugin.files.SelectedKitFile;
 import be.live.jonas2000.KitPvPPlugin.files.TempStatisticsFile;
 import be.live.jonas2000.KitPvPPlugin.listeners.PlayerListener;
-import be.live.jonas2000.KitPvPPlugin.tabcompleter.modTabCompleter;
+import be.live.jonas2000.KitPvPPlugin.nms.HeaderFooter;
+import be.live.jonas2000.KitPvPPlugin.tabcompleter.ModTabCompleter;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -39,6 +41,7 @@ public class Main extends JavaPlugin {
     private String password;
     private int port;
     private static Main plugin;
+    private static List<Player> playersInLobby = new ArrayList<>();
 
     public Main() {
     }
@@ -47,9 +50,12 @@ public class Main extends JavaPlugin {
     public void onEnable() {
         plugin = this;
         Bukkit.getPluginManager().registerEvents(new PlayerListener(), this);
+        Bukkit.getPluginManager().registerEvents(new HeaderFooter(), this);
         getCommand("mod").setExecutor(new ModeratorCommand());
-        getCommand("mod").setTabCompleter(new modTabCompleter());
+        getCommand("mod").setTabCompleter(new ModTabCompleter());
         getCommand("moderator").setExecutor(new ModeratorCommand());
+        getCommand("spawn").setExecutor(new SpawnCommand());
+
         this.host = "localhost";
         this.port = 3306;
         this.database = "kitpvpddg";
@@ -71,8 +77,12 @@ public class Main extends JavaPlugin {
         LocationFile.create();
         LocationFile.getLocationFile().options().copyDefaults(true);
         LocationFile.save();
+        //SelectedKitFile Creation
+        SelectedKitFile.create();
+        SelectedKitFile.getSelectedKitFile().options().copyDefaults(true);
+        SelectedKitFile.save();
         //Default Spawn Creation
-        if(!LocationFile.getLocationFile().contains("Locations.Spawn")) {
+        if (!LocationFile.getLocationFile().contains("Locations.Spawn")) {
             List<String> worlds = new ArrayList<>(Arrays.asList(Bukkit.getWorlds().toString()));
             LocationFile.getLocationFile().set("Locations.Spawn.X", 0);
             LocationFile.getLocationFile().set("Locations.Spawn.Y", 100);
@@ -106,6 +116,19 @@ public class Main extends JavaPlugin {
     public static Main getPlugin() {
         return plugin;
     }
+
+    public static List<Player> getPlayersInLobby() {
+        return playersInLobby;
+    }
+
+    public static void addPlayerInLobby(Player player) {
+        playersInLobby.add(player);
+    }
+
+    public static void removePlayerInLobby(Player player) {
+        playersInLobby.remove(player);
+    }
+
 
     public static void buildSidebar(Player player) throws IllegalArgumentException, IllegalStateException, SQLException {
         double ratio;
@@ -166,7 +189,7 @@ public class Main extends JavaPlugin {
         int possibleOldDeaths = death - 1;
         int coins = coinSet.getInt("COINS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Coins");
         if (death == 0) {
-            newRatio = kill;
+            newRatioRoundUp = kill;
         } else {
             newRatio = (double) kill / death;
             newRatioRoundUp = (double) Math.round(newRatio * 100) / 100;
@@ -214,6 +237,7 @@ public class Main extends JavaPlugin {
             }
         }
         TempStatisticsFile.getFile().delete();
+
     }
 }
 

@@ -1,6 +1,7 @@
 package be.live.jonas2000.KitPvPPlugin.commands;
 
 import be.live.jonas2000.KitPvPPlugin.files.LocationFile;
+import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -40,7 +41,7 @@ public class ModeratorCommand implements CommandExecutor {
                 StringBuilder message = new StringBuilder();
 
                 ConfigurationSection sec = LocationFile.getLocationFile().getConfigurationSection("Locations");
-                for (String locationName: sec.getKeys(false)) {
+                for (String locationName : sec.getKeys(false)) {
                     message.append(locationName).append(", ");
                 }
                 player.sendMessage(message.toString());
@@ -50,7 +51,7 @@ public class ModeratorCommand implements CommandExecutor {
                 String input = args[1];
                 String warpName = input.substring(0, 1).toUpperCase() + input.substring(1).toLowerCase();
                 LocationFile.getLocationFile().set("Locations." + warpName, null);
-
+                LocationFile.save();
                 // Kick player
             } else if (args[0].equalsIgnoreCase("kick")) { // KICK COMMAND
                 if (args.length == 1) {
@@ -79,9 +80,30 @@ public class ModeratorCommand implements CommandExecutor {
                 }
                 // Ban player
             } else if (args[0].equalsIgnoreCase("ban")) {
+                if (args.length == 1) {
+                    player.sendMessage("/mod ban <Name> <Reason>");
+                } else if (args.length == 2) {
+                    String playerName = args[1];
+                    if (Bukkit.getPlayer(playerName) != null) {
+                        Bukkit.getBanList(BanList.Type.NAME).addBan(playerName,ChatColor.RED + "You have been banned!",null,null);
+                        player.kickPlayer("You have been banned!");
+                    } else {
+                        player.sendMessage("Player is not Online!");
+                    }
+                } else {
+                    String playerName = args[1];
+                    if (Bukkit.getPlayer(playerName) != null) {
+                        StringBuilder message = new StringBuilder();
+                        for (int i = 2; i < args.length; i++) {
+                            message.append(" ").append(args[i]);
+                        }
+                        Bukkit.getBanList(BanList.Type.NAME).addBan(playerName, ChatColor.RED + message.toString(), null, null);
+                    } else {
+                        player.sendMessage("Player is not Online!");
+                    }
+                }
 
             }
-
         }
         return false;
     }

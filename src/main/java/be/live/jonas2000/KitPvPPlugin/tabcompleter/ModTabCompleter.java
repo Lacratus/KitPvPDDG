@@ -10,8 +10,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class modTabCompleter implements TabCompleter {
-    private static final String[] COMMANDS = {"Kick","Ban","Teleport"};
+public class ModTabCompleter implements TabCompleter {
+    private static final String[] COMMANDS = {"setSpawn","setWarp","warpList","delWarp","kick","ban"};
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args){
