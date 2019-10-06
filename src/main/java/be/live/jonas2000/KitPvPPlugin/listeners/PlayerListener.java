@@ -38,6 +38,7 @@ public class PlayerListener implements Listener {
     public void onJoin(PlayerJoinEvent e) throws IllegalArgumentException, IllegalStateException, SQLException {
         Player player = e.getPlayer();
         String UUID = player.getUniqueId().toString();
+        //Players being added to database on first join
         try {
             ResultSet rs = Main.prepareStatement("SELECT COUNT(UUID) FROM player_info WHERE UUID = '" + player.getUniqueId().toString() + "';").executeQuery();
             rs.next();
@@ -81,6 +82,7 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onDisconnect(PlayerQuitEvent e) {
+        //Update statistics in database and send them to the lobby
         Player player = e.getPlayer();
         player.getInventory().clear();
         player.teleport(new Location(player.getWorld(), 100.0D, 100.0D, 100.0D));
@@ -103,14 +105,12 @@ public class PlayerListener implements Listener {
             ex.printStackTrace();
         }
 
-        if (!Main.getPlayersInLobby().contains(player)) {
-            Main.addPlayerInLobby(player);
-        }
         player.getInventory().clear();
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent e) throws SQLException {
+        // People being added in YAML File and scoreboard update
         Player player = e.getEntity();
         Player killer = e.getEntity().getKiller();
 
@@ -140,6 +140,7 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent e) {
+        //Player teleported to spawn
         final World kitPvP = Bukkit.getWorld(LocationFile.getLocationFile().getString("Locations.Spawn.WorldName"));
         final Player player = e.getPlayer();
         player.getInventory().setItem(4, new ItemStack(Material.COMPASS));
@@ -158,9 +159,11 @@ public class PlayerListener implements Listener {
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
         Player player = e.getPlayer();
+        // opens kitselection
         if (player.getItemInHand().getType().equals(Material.COMPASS)) {
             openKitSelection(player, getSelectedKit(player));
         }
+        //Teleports you to location(USE ["Location"], First letter needs to be uppercase)
         if (e.getAction() == Action.RIGHT_CLICK_BLOCK && e.getClickedBlock().getState() instanceof Sign) {
             Sign teleportSign = (Sign) e.getClickedBlock().getState();
             String line = teleportSign.getLine(0);
@@ -189,6 +192,7 @@ public class PlayerListener implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         Player player = (Player) e.getWhoClicked();
+        // Show which kit a player choose
         if (ChatColor.translateAlternateColorCodes('&', e.getClickedInventory().getTitle()).equals(ChatColor.DARK_GREEN + "Choose a kit!") && e.getCurrentItem() != null) {
             e.setCancelled(true);
             ItemStack warrior;
@@ -247,6 +251,7 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onSignChance(SignChangeEvent e) {
+        // Turns first line into blue if it is a location.
         ConfigurationSection sec = LocationFile.getLocationFile().getConfigurationSection("Locations");
         for (String locatieNaam : sec.getKeys(false)) {
             if (e.getLine(0).equals("[" + locatieNaam + "]")) {
@@ -255,18 +260,21 @@ public class PlayerListener implements Listener {
         }
     }
 
+    // Player drops no items
     @EventHandler
     public void onPlayerDropItem(PlayerDropItemEvent e) {
         e.setCancelled(true);
     }
 
+
+    // No hunger
     @EventHandler
     public void onFoodLevelChange(FoodLevelChangeEvent e) {
-
-                e.setCancelled(true);
+        e.setCancelled(true);
 
     }
 
+    // No damage in lobby
     @EventHandler
     public void onTakingDamage(EntityDamageEvent e) {
         if (e.getEntity() instanceof Player) {

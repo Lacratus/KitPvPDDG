@@ -129,7 +129,7 @@ public class Main extends JavaPlugin {
         playersInLobby.remove(player);
     }
 
-
+    // Build sidebar when a player logs in
     public static void buildSidebar(Player player) throws IllegalArgumentException, IllegalStateException, SQLException {
         double ratio;
         double ratioRoundUp = 0;
@@ -168,7 +168,7 @@ public class Main extends JavaPlugin {
         player.setScoreboard(board);
 
     }
-
+    // Update sidebar after kill/death
     public static void updateSidebar(Player player, String killDeathDisconnectRestart) throws SQLException {
         double newRatio;
         double oldRatio;
@@ -218,6 +218,7 @@ public class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Add statistics to database on restart/stop
         ConfigurationSection sec = TempStatisticsFile.getTempStatisticsFile().getConfigurationSection("Players");
         for (String stringUUID : sec.getKeys(false)) {
             int kills = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + stringUUID + ".Kills");
