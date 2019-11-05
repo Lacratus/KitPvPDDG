@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 public class ModTabCompleter implements TabCompleter {
-    private static final String[] COMMANDS = {"setSpawn","setWarp","warpList","delWarp","kick","ban"};
+    private final String[] COMMANDS = {"setSpawn","setWarp","warpList","delWarp","kick","ban"};
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args){

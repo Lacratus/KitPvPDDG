@@ -8,40 +8,35 @@ package be.live.jonas2000.KitPvPPlugin;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
+import be.live.jonas2000.KitPvPPlugin.objects.KitPvPPlayer;
 import be.live.jonas2000.KitPvPPlugin.commands.ModeratorCommand;
 import be.live.jonas2000.KitPvPPlugin.commands.SpawnCommand;
-import be.live.jonas2000.KitPvPPlugin.files.LocationFile;
-import be.live.jonas2000.KitPvPPlugin.files.SelectedKitFile;
-import be.live.jonas2000.KitPvPPlugin.files.TempStatisticsFile;
+import be.live.jonas2000.KitPvPPlugin.files.ConfigFile;
 import be.live.jonas2000.KitPvPPlugin.listeners.PlayerListener;
 import be.live.jonas2000.KitPvPPlugin.nms.HeaderFooter;
 import be.live.jonas2000.KitPvPPlugin.tabcompleter.ModTabCompleter;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Score;
-import org.bukkit.scoreboard.Scoreboard;
 
 public class Main extends JavaPlugin {
-    private static Connection connection;
+    private Connection connection;
     private String host;
     private String database;
     private String username;
     private String password;
     private int port;
-    private static Main plugin;
-    private static List<Player> playersInLobby = new ArrayList<>();
+    private Main plugin;
+    private List<Player> playersInLobby = new ArrayList<>();
+    private PlayerListener listener;
+    private ConfigFile locationFile;
+    private ConfigFile selectedKitFile;
+    // Name of files
+    String locationFileName ="Locations.yml";
+    String selectedKitFileName ="selectedKits.yml";
 
     public Main() {
     }
@@ -49,13 +44,22 @@ public class Main extends JavaPlugin {
     @Override
     public void onEnable() {
         plugin = this;
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(), this);
-        Bukkit.getPluginManager().registerEvents(new HeaderFooter(), this);
-        getCommand("mod").setExecutor(new ModeratorCommand());
-        getCommand("mod").setTabCompleter(new ModTabCompleter());
-        getCommand("moderator").setExecutor(new ModeratorCommand());
-        getCommand("spawn").setExecutor(new SpawnCommand());
+        //file creation
 
+            this.locationFile = new ConfigFile(locationFileName);
+            this.selectedKitFile = new ConfigFile(selectedKitFileName);
+
+
+        this.listener = new PlayerListener(this);
+        // Listeners and Commands
+        Bukkit.getPluginManager().registerEvents(listener, this);
+        Bukkit.getPluginManager().registerEvents(new HeaderFooter(), this);
+        getCommand("mod").setExecutor(new ModeratorCommand(this));
+        getCommand("mod").setTabCompleter(new ModTabCompleter());
+        getCommand("moderator").setExecutor(new ModeratorCommand(this));
+        getCommand("spawn").setExecutor(new SpawnCommand(this));
+
+        //Database connection
         this.host = "localhost";
         this.port = 3306;
         this.database = "kitpvpddg";
@@ -68,32 +72,28 @@ public class Main extends JavaPlugin {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        //TempStatisticsFile Creation
-        TempStatisticsFile.create();
-        TempStatisticsFile.getTempStatisticsFile().options().copyDefaults(true);
-        TempStatisticsFile.save();
 
-        //LocationFile Creation
-        LocationFile.create();
-        LocationFile.getLocationFile().options().copyDefaults(true);
-        LocationFile.save();
-        //SelectedKitFile Creation
-        SelectedKitFile.create();
-        SelectedKitFile.getSelectedKitFile().options().copyDefaults(true);
-        SelectedKitFile.save();
         //Default Spawn Creation
-        if (!LocationFile.getLocationFile().contains("Locations.Spawn")) {
-            List<String> worlds = new ArrayList<>(Arrays.asList(Bukkit.getWorlds().toString()));
-            LocationFile.getLocationFile().set("Locations.Spawn.X", 0);
-            LocationFile.getLocationFile().set("Locations.Spawn.Y", 100);
-            LocationFile.getLocationFile().set("Locations.Spawn.Z", 0);
-            LocationFile.getLocationFile().set("Locations.Spawn.Yaw", 0);
-            LocationFile.getLocationFile().set("Locations.Spawn.Pitch", 0);
-            LocationFile.getLocationFile().set("Locations.Spawn.WorldName", worlds.get(0));
-            LocationFile.save();
+        if (!locationFile.getConfig().contains("Locations.Spawn")) {
+            locationFile.getConfig().set("Locations.Spawn.X", 0);
+            locationFile.getConfig().set("Locations.Spawn.Y", 100);
+            locationFile.getConfig().set("Locations.Spawn.Z", 0);
+            locationFile.getConfig().set("Locations.Spawn.Yaw", 0);
+            locationFile.getConfig().set("Locations.Spawn.Pitch", 0);
+            locationFile.getConfig().set("Locations.Spawn.WorldName", "world");
         }
+        //Database update every 15 Minutes
+        int id = Bukkit.getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() {
+            @Override
+            public void run() {
+                updateDatabase();
+                System.out.println("WORKING SCHEDULER");
+                getServer().broadcastMessage("GESLAAGD");
+            }
+        }, 0, 1200L * 1);
 
     }
+
 
     private void openConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
@@ -101,7 +101,7 @@ public class Main extends JavaPlugin {
         }
     }
 
-    public static PreparedStatement prepareStatement(String query) {
+    public PreparedStatement prepareStatement(String query) {
         PreparedStatement ps = null;
 
         try {
@@ -113,132 +113,63 @@ public class Main extends JavaPlugin {
         return ps;
     }
 
-    public static Main getPlugin() {
+    public Main getPlugin() {
         return plugin;
     }
 
-    public static List<Player> getPlayersInLobby() {
+    public List<Player> getPlayersInLobby() {
         return playersInLobby;
     }
 
-    public static void addPlayerInLobby(Player player) {
+    public void addPlayerInLobby(Player player) {
         playersInLobby.add(player);
     }
 
-    public static void removePlayerInLobby(Player player) {
+    public void removePlayerInLobby(Player player) {
         playersInLobby.remove(player);
     }
 
-    // Build sidebar when a player logs in
-    public static void buildSidebar(Player player) throws IllegalArgumentException, IllegalStateException, SQLException {
-        double ratio;
-        double ratioRoundUp = 0;
-        String UUID = player.getUniqueId().toString();
-        Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective obj = board.registerNewObjective("test", "dummy");
-        obj.setDisplayName("KitPvP");
-        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-        Score under = obj.getScore(ChatColor.YELLOW + "www.Lacratus.be");
-        under.setScore(1);
-        ResultSet killSet = prepareStatement("SELECT KILLS FROM player_info WHERE UUID = '" + UUID + "';").executeQuery();
-        killSet.next();
-        int kill = killSet.getInt("KILLS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".KILLS");
-        Score kills = obj.getScore("Kills: " + kill);
-        kills.setScore(9);
-        ResultSet deathSet = prepareStatement("SELECT DEATHS FROM player_info WHERE UUID = '" + UUID + "';").executeQuery();
-        deathSet.next();
-        int death = deathSet.getInt("DEATHS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".DEATHS");
-        Score deaths = obj.getScore("Deaths: " + death);
-        deaths.setScore(7);
-        ResultSet coinSet = prepareStatement("SELECT COINS FROM player_info WHERE UUID = '" + UUID + "';").executeQuery();
-        coinSet.next();
-        int coin = coinSet.getInt("COINS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".COINS");
-        Score coins = obj.getScore("Coins: " + coin);
-        coins.setScore(5);
-        if (death == 0) {
-            ratio = kill;
-            Score rat = obj.getScore("Ratio: " + ratio);
-            rat.setScore(3);
-        } else {
-            ratio = (double) kill / death;
-            ratioRoundUp = (double) Math.round(ratio * 100) / 100;
-            Score rat = obj.getScore("Ratio: " + ratioRoundUp);
-            rat.setScore(3);
-        }
-        player.setScoreboard(board);
 
-    }
-    // Update sidebar after kill/death
-    public static void updateSidebar(Player player, String killDeathDisconnectRestart) throws SQLException {
-        double newRatio;
-        double oldRatio;
-        double newRatioRoundUp = 0;
 
-        String UUID = player.getUniqueId().toString();
-        // Creëeren van Resultsets
-        ResultSet killSet = prepareStatement("SELECT KILLS FROM player_info WHERE UUID = '" + player.getUniqueId() + "';").executeQuery();
-        killSet.next();
-        ResultSet deathSet = prepareStatement("SELECT DEATHS FROM player_info WHERE UUID = '" + player.getUniqueId() + "';").executeQuery();
-        deathSet.next();
-        ResultSet coinSet = prepareStatement("SELECT COINS FROM player_info WHERE UUID = '" + player.getUniqueId() + "';").executeQuery();
-        coinSet.next();
-        // Bekijken variabelen
-        int kill = killSet.getInt("KILLS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Kills");
-        int possibleOldKills = kill - 1;
-        int death = deathSet.getInt("DEATHS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Deaths");
-        int possibleOldDeaths = death - 1;
-        int coins = coinSet.getInt("COINS") + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".Coins");
-        if (death == 0) {
-            newRatioRoundUp = kill;
-        } else {
-            newRatio = (double) kill / death;
-            newRatioRoundUp = (double) Math.round(newRatio * 100) / 100;
-        }
-        //reset Ratio
-        if (killDeathDisconnectRestart.equals("Kill")) {
-            oldRatio = (double) (kill - 1) / death;
-            double oldRatioRoundUp = (double) Math.round(oldRatio * 100) / 100;
-            player.getScoreboard().resetScores("Ratio: " + oldRatioRoundUp);
-        } else if (killDeathDisconnectRestart.equals("Death")) {
-            oldRatio = (double) kill / (death - 1);
-            double oldRatioRoundUp = (double) Math.round(oldRatio * 100) / 100;
-            player.getScoreboard().resetScores("Ratio: " + oldRatioRoundUp);
-        }
-
-        //resetten en updaten scoreboard
-        player.getScoreboard().resetScores("Kills: " + (possibleOldKills));
-        player.getScoreboard().getObjective("test").getScore("Kills: " + kill).setScore(9);
-        player.getScoreboard().resetScores("Deaths: " + (possibleOldDeaths));
-        player.getScoreboard().getObjective("test").getScore("Deaths: " + death).setScore(7);
-        player.getScoreboard().resetScores("Coins: " + (coins - 10));
-        player.getScoreboard().getObjective("test").getScore("Coins: " + coins).setScore(5);
-        player.getScoreboard().getObjective("test").getScore("Ratio: " + newRatioRoundUp).setScore(3);
-    }
 
 
     @Override
     public void onDisable() {
         // Add statistics to database on restart/stop
-        ConfigurationSection sec = TempStatisticsFile.getTempStatisticsFile().getConfigurationSection("Players");
-        for (String stringUUID : sec.getKeys(false)) {
-            int kills = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + stringUUID + ".Kills");
-            int deaths = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + stringUUID + ".Deaths");
+        //ConfigurationSection sec = TempStatisticsFile.getTempStatisticsFile().getConfigurationSection("Players");
+        updateDatabase();
+    }
+
+    public ConfigFile getLocationFile() {
+        return locationFile;
+    }
+
+    public ConfigFile getSelectedKitFile() {
+        return selectedKitFile;
+    }
+
+    public void updateDatabase(){
+        Iterator iterator = listener.playerList.entrySet().iterator();
+        while(iterator.hasNext()){
+            Map.Entry MEUUID = (Map.Entry) iterator.next();
+            KitPvPPlayer player = listener.playerList.get(MEUUID.getKey());
+            int kills = player.getKills();
+            int deaths = player.getDeaths();
+            int coins = player.getCoins();
 
             try {
-                Main.prepareStatement("UPDATE player_info SET DEATHS = DEATHS + "
-                        + TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Deaths")
-                        + ",KILLS = KILLS + "
-                        + TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Kills")
-                        + ",COINS = COINS + "
-                        + TempStatisticsFile.getTempStatisticsFile().get("Players." + stringUUID + ".Coins")
-                        + " WHERE UUID = '" + stringUUID + "';").executeUpdate();
-                Main.updateSidebar(Bukkit.getPlayer(UUID.fromString(stringUUID)), "Restart");
+                plugin.prepareStatement("UPDATE player_info SET DEATHS = "
+                        + deaths
+                        + ",KILLS ="
+                        + kills
+                        + ",COINS ="
+                        + coins
+                        + " WHERE UUID = '" + MEUUID.getKey() + "';").executeUpdate();
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
         }
-        TempStatisticsFile.getFile().delete();
-
     }
+
 }
 

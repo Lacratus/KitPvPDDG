@@ -2,12 +2,13 @@ package be.live.jonas2000.KitPvPPlugin.listeners;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 import be.live.jonas2000.KitPvPPlugin.Main;
-import be.live.jonas2000.KitPvPPlugin.files.LocationFile;
-import be.live.jonas2000.KitPvPPlugin.files.SelectedKitFile;
-import be.live.jonas2000.KitPvPPlugin.files.TempStatisticsFile;
-import com.sun.org.apache.bcel.internal.generic.Select;
+import be.live.jonas2000.KitPvPPlugin.objects.KitPvPPlayer;
+import be.live.jonas2000.KitPvPPlugin.files.ConfigFile;
+import be.live.jonas2000.KitPvPPlugin.scoreboard.Sidebar;
 import org.bukkit.*;
 import org.bukkit.block.Sign;
 import org.bukkit.configuration.ConfigurationSection;
@@ -31,7 +32,16 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 public class PlayerListener implements Listener {
 
-    public PlayerListener() {
+    public Map<String,KitPvPPlayer> playerList = new HashMap<>();
+    private  Main plugin;
+    private ConfigFile locationFile;
+    private ConfigFile selectedKitFile;
+    private Sidebar sidebar;
+
+    public PlayerListener(Main plugin) {
+        this.plugin = plugin;
+        locationFile = plugin.getLocationFile();
+        selectedKitFile = plugin.getSelectedKitFile();
     }
 
     @EventHandler
@@ -40,14 +50,14 @@ public class PlayerListener implements Listener {
         String UUID = player.getUniqueId().toString();
         //Players being added to database on first join
         try {
-            ResultSet rs = Main.prepareStatement("SELECT COUNT(UUID) FROM player_info WHERE UUID = '" + player.getUniqueId().toString() + "';").executeQuery();
+            ResultSet rs = plugin.prepareStatement("SELECT COUNT(UUID) FROM player_info WHERE UUID = '" + player.getUniqueId().toString() + "';").executeQuery();
             rs.next();
             if (rs.getInt(1) == 0) {
-                Main.prepareStatement("INSERT INTO player_info(UUID, IP, KILLS, DEATHS, COINS, JOIN_DATE) VALUES ('"
+                plugin.prepareStatement("INSERT INTO player_info(UUID, IP, KILLS, DEATHS, COINS, JOIN_DATE) VALUES ('"
                         + player.getUniqueId().toString() + "','" + player.getAddress() + "', DEFAULT, DEFAULT, DEFAULT, DEFAULT);").executeUpdate();
 
             } else {
-                ResultSet rs2 = Main.prepareStatement("SELECT * FROM player_info WHERE UUID = '" + player.getUniqueId() + "';").executeQuery();
+                ResultSet rs2 = plugin.prepareStatement("SELECT * FROM player_info WHERE UUID = '" + player.getUniqueId() + "';").executeQuery();
                 rs2.next();
 
             }
@@ -55,28 +65,32 @@ public class PlayerListener implements Listener {
             ex.printStackTrace();
         }
 
-        if (!TempStatisticsFile.getTempStatisticsFile().contains("Players." + UUID)) {
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + UUID + ".Kills", 0);
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + UUID + ".Deaths", 0);
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + UUID + ".Coins", 0);
-            TempStatisticsFile.save();
-        }
-        Main.addPlayerInLobby(player);
+        ResultSet killSet = plugin.prepareStatement("SELECT KILLS,Deaths,Coins FROM player_info WHERE UUID = '" + UUID + "';").executeQuery();
+        killSet.next();
+        int kill = killSet.getInt("KILLS");
+        int death = killSet.getInt("DEATHS");// + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".DEATHS")
+        int coin = killSet.getInt("COINS");// + TempStatisticsFile.getTempStatisticsFile().getInt("Players." + UUID + ".COINS");
+
+        //KitPvPPlayer being constructed & added in hashmap
+        KitPvPPlayer p = new KitPvPPlayer(UUID,kill,death,coin);
+        playerList.put(UUID, p);
+        sidebar = new Sidebar(player,kill,death,coin);
+        plugin.addPlayerInLobby(player);
         player.getInventory().clear();
         player.getInventory().setItem(4, new ItemStack(Material.COMPASS));
-        if (!LocationFile.getLocationFile().contains("Locations.Spawn")) {
+
+        if (!locationFile.getConfig().contains("Locations.Spawn")) {
             player.teleport(new Location(player.getWorld(), 0, 100, 0));
             player.sendMessage("Plaats een spawn met /mod setspawn");
         } else {
-            final World kitPvP = Bukkit.getWorld(LocationFile.getLocationFile().getString("Locations.Spawn.WorldName"));
+            final World kitPvP = Bukkit.getWorld(locationFile.getConfig().getString("Locations.Spawn.WorldName"));
             player.teleport(new Location(kitPvP
-                    , LocationFile.getLocationFile().getInt("Locations.Spawn.X")
-                    , LocationFile.getLocationFile().getInt("Locations.Spawn.Y")
-                    , LocationFile.getLocationFile().getInt("Locations.Spawn.Z")
-                    , (float) LocationFile.getLocationFile().getDouble("Locations.Spawn.Yaw")
-                    , (float) LocationFile.getLocationFile().getDouble("Locations.Spawn.Pitch")));
+                    , locationFile.getConfig().getInt("Locations.Spawn.X")
+                    , locationFile.getConfig().getInt("Locations.Spawn.Y")
+                    , locationFile.getConfig().getInt("Locations.Spawn.Z")
+                    , (float) locationFile.getConfig().getDouble("Locations.Spawn.Yaw")
+                    , (float) locationFile.getConfig().getDouble("Locations.Spawn.Pitch")));
         }
-        Main.buildSidebar(player);
     }
 
 
@@ -89,22 +103,17 @@ public class PlayerListener implements Listener {
         player.getInventory().setItem(4, new ItemStack(Material.COMPASS));
         String UUID = player.getUniqueId().toString();
         try {
-            Main.prepareStatement("UPDATE player_info SET DEATHS = DEATHS + "
-                    + TempStatisticsFile.getTempStatisticsFile().get("Players." + UUID + ".Deaths")
-                    + ",KILLS = KILLS + "
-                    + TempStatisticsFile.getTempStatisticsFile().get("Players." + UUID + ".Kills")
-                    + ",COINS = COINS + "
-                    + TempStatisticsFile.getTempStatisticsFile().get("Players." + UUID + ".Coins")
+            plugin.prepareStatement("UPDATE player_info SET DEATHS = "
+                    + playerList.get(UUID).getDeaths()
+                    + ",KILLS = "
+                    + playerList.get(UUID).getKills()
+                    + ",COINS = "
+                    + playerList.get(UUID).getCoins()
                     + " WHERE UUID = '" + UUID + "';").executeUpdate();
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + UUID + ".Kills", 0);
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + UUID + ".Deaths", 0);
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + UUID + ".Coins", 0);
-            TempStatisticsFile.save();
-            Main.updateSidebar(player, "Disconnect");
         } catch (SQLException ex) {
             ex.printStackTrace();
         }
-
+        playerList.remove(UUID);
         player.getInventory().clear();
     }
 
@@ -117,41 +126,37 @@ public class PlayerListener implements Listener {
         if (killer instanceof Player && killer != null) {
             String pUUID = player.getUniqueId().toString();
             String kUUID = killer.getUniqueId().toString();
-
-            int deathsPlayer = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + pUUID + ".Deaths");
-            int killsKiller = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + kUUID + ".Kills");
-            int coinsKiller = TempStatisticsFile.getTempStatisticsFile().getInt("Players." + kUUID + ".Coins");
-
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + pUUID + ".Deaths", deathsPlayer + 1);
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + kUUID + ".Kills", killsKiller + 1);
-            TempStatisticsFile.getTempStatisticsFile().set("Players." + kUUID + ".Coins", coinsKiller + 10);
-            TempStatisticsFile.save();
+            KitPvPPlayer player1 = playerList.get(pUUID);
+            KitPvPPlayer killer1 = playerList.get(kUUID);
+            player1.setDeaths(player1.getDeaths() +1);
+            killer1.setKills(killer1.getKills() + 1);
+            killer1.setCoins(killer1.getCoins() + 10);
 
 
             killer.sendMessage("You've earned 10 gold");
-            Main.updateSidebar(player, "Death");
-            Main.updateSidebar(killer, "Kill");
+            sidebar.update(killer, false);
+            sidebar.update(player, true);
         }
         e.getDrops().clear();
 
-        Main.addPlayerInLobby(player);
+        plugin.addPlayerInLobby(player);
 
     }
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent e) {
         //Player teleported to spawn
-        final World kitPvP = Bukkit.getWorld(LocationFile.getLocationFile().getString("Locations.Spawn.WorldName"));
+        final World kitPvP = Bukkit.getWorld(locationFile.getConfig().getString("Locations.Spawn.WorldName"));
         final Player player = e.getPlayer();
         player.getInventory().setItem(4, new ItemStack(Material.COMPASS));
-        Bukkit.getServer().getScheduler().scheduleAsyncDelayedTask(Main.getPlugin(), new Runnable() {
+        Bukkit.getServer().getScheduler().scheduleAsyncDelayedTask(plugin.getPlugin(), new Runnable() {
             public void run() {
                 player.teleport(new Location(kitPvP
-                        , LocationFile.getLocationFile().getDouble("Locations.Spawn.X")
-                        , LocationFile.getLocationFile().getDouble("Locations.Spawn.Y")
-                        , LocationFile.getLocationFile().getDouble("Locations.Spawn.Z")
-                        , (float) LocationFile.getLocationFile().getDouble("Locations.Spawn.Yaw")
-                        , (float) LocationFile.getLocationFile().getDouble("Locations.Spawn.Pitch")));
+                        , locationFile.getConfig().getDouble("Locations.Spawn.X")
+                        , locationFile.getConfig().getDouble("Locations.Spawn.Y")
+                        , locationFile.getConfig().getDouble("Locations.Spawn.Z")
+                        , (float) locationFile.getConfig().getDouble("Locations.Spawn.Yaw")
+                        , (float) locationFile.getConfig().getDouble("Locations.Spawn.Pitch")));
             }
         }, 10L);
     }
@@ -163,24 +168,27 @@ public class PlayerListener implements Listener {
         if (player.getItemInHand().getType().equals(Material.COMPASS)) {
             openKitSelection(player, getSelectedKit(player));
         }
-        //Teleports you to location(USE ["Location"], First letter needs to be uppercase)
-        if (e.getAction() == Action.RIGHT_CLICK_BLOCK && e.getClickedBlock().getState() instanceof Sign) {
+        //Telµeports you to location(USE ["Location"], First letter needs to be uppercase)
+        if(getSelectedKit(player) == null && e.getAction() == Action.RIGHT_CLICK_BLOCK && e.getClickedBlock().getState() instanceof Sign){
+            player.sendMessage("Choose a kit before clicking on a sign!");
+        }
+        else if (e.getAction() == Action.RIGHT_CLICK_BLOCK && e.getClickedBlock().getState() instanceof Sign ) {
             Sign teleportSign = (Sign) e.getClickedBlock().getState();
             String line = teleportSign.getLine(0);
-            ConfigurationSection sec = LocationFile.getLocationFile().getConfigurationSection("Locations");
+            ConfigurationSection sec = locationFile.getConfig().getConfigurationSection("Locations");
             for (String locatieNaam : sec.getKeys(false)) {
                 if (line.equals(ChatColor.BLUE + "[" + locatieNaam + "]")) {
-                    World kitPvP = Bukkit.getWorld((LocationFile.getLocationFile().getString("Locations." + locatieNaam + ".WorldName")));
+                    World kitPvP = Bukkit.getWorld((locationFile.getConfig().getString("Locations." + locatieNaam + ".WorldName")));
                     player.teleport(new Location(kitPvP
-                            , LocationFile.getLocationFile().getDouble("Locations." + locatieNaam + ".X")
-                            , LocationFile.getLocationFile().getDouble("Locations." + locatieNaam + ".Y")
-                            , LocationFile.getLocationFile().getDouble("Locations." + locatieNaam + ".Z")
-                            , (float) LocationFile.getLocationFile().getDouble("Locations." + locatieNaam + ".Yaw")
-                            , (float) LocationFile.getLocationFile().getDouble("Locations." + locatieNaam + ".Pitch")
+                            , locationFile.getConfig().getDouble("Locations." + locatieNaam + ".X")
+                            , locationFile.getConfig().getDouble("Locations." + locatieNaam + ".Y")
+                            , locationFile.getConfig().getDouble("Locations." + locatieNaam + ".Z")
+                            , (float) locationFile.getConfig().getDouble("Locations." + locatieNaam + ".Yaw")
+                            , (float) locationFile.getConfig().getDouble("Locations." + locatieNaam + ".Pitch")
                     ));
                     player.getInventory().clear();
                     giveKit(player, getSelectedKit(player));
-                    Main.removePlayerInLobby(player);
+                    plugin.removePlayerInLobby(player);
                 }
 
             }
@@ -193,7 +201,11 @@ public class PlayerListener implements Listener {
     public void onClick(InventoryClickEvent e) {
         Player player = (Player) e.getWhoClicked();
         // Show which kit a player choose
-        if (ChatColor.translateAlternateColorCodes('&', e.getClickedInventory().getTitle()).equals(ChatColor.DARK_GREEN + "Choose a kit!") && e.getCurrentItem() != null) {
+        if(e.getCurrentItem() == null){
+
+        } else if(e.getCurrentItem() == null && ChatColor.translateAlternateColorCodes('&', e.getClickedInventory().getTitle()).equals(ChatColor.DARK_GREEN + "Choose a kit!")){
+
+        } else if (ChatColor.translateAlternateColorCodes('&', e.getClickedInventory().getTitle()).equals(ChatColor.DARK_GREEN + "Choose a kit!")) {
             e.setCancelled(true);
             ItemStack warrior;
             ItemStack archer;
@@ -242,8 +254,6 @@ public class PlayerListener implements Listener {
                     player.openInventory(gui);
                     setSelectedKit(player, Material.DIAMOND_CHESTPLATE);
                     break;
-                default:
-
             }
         }
 
@@ -252,7 +262,7 @@ public class PlayerListener implements Listener {
     @EventHandler
     public void onSignChance(SignChangeEvent e) {
         // Turns first line into blue if it is a location.
-        ConfigurationSection sec = LocationFile.getLocationFile().getConfigurationSection("Locations");
+        ConfigurationSection sec = locationFile.getConfig().getConfigurationSection("Locations");
         for (String locatieNaam : sec.getKeys(false)) {
             if (e.getLine(0).equals("[" + locatieNaam + "]")) {
                 e.setLine(0, ChatColor.BLUE + "[" + locatieNaam + "]");
@@ -269,16 +279,13 @@ public class PlayerListener implements Listener {
 
     // No hunger
     @EventHandler
-    public void onFoodLevelChange(FoodLevelChangeEvent e) {
-        e.setCancelled(true);
-
-    }
+    public void onFoodLevelChange(FoodLevelChangeEvent e) { e.setCancelled(true); }
 
     // No damage in lobby
     @EventHandler
     public void onTakingDamage(EntityDamageEvent e) {
         if (e.getEntity() instanceof Player) {
-            if (Main.getPlayersInLobby().contains((Player) e.getEntity())) {
+            if (plugin.getPlayersInLobby().contains((Player) e.getEntity())) {
                 e.setCancelled(true);
             }
         }
@@ -326,6 +333,7 @@ public class PlayerListener implements Listener {
                     gui.setItem(5, tank);
                     player.openInventory(gui);
                     break;
+                default: player.sendMessage("Choose a kit first!");
             }
         }
     }
@@ -366,12 +374,12 @@ public class PlayerListener implements Listener {
     }
 
     private void setSelectedKit(Player player, Material selectedKit) {
-        SelectedKitFile.getSelectedKitFile().set("Spelers." + player.getUniqueId().toString(), selectedKit.toString());
-        SelectedKitFile.save();
+        selectedKitFile.getConfig().set("Spelers." + player.getUniqueId().toString(), selectedKit.toString());
+        selectedKitFile.saveFile();
     }
 
     private String getSelectedKit(Player player) {
-        return (String) SelectedKitFile.getSelectedKitFile().get("Spelers." + player.getUniqueId().toString());
+        return (String) selectedKitFile.getConfig().get("Spelers." + player.getUniqueId().toString());
     }
 
 }

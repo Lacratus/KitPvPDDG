@@ -1,6 +1,7 @@
 package be.live.jonas2000.KitPvPPlugin.commands;
 
-import be.live.jonas2000.KitPvPPlugin.files.LocationFile;
+import be.live.jonas2000.KitPvPPlugin.Main;
+import be.live.jonas2000.KitPvPPlugin.files.ConfigFile;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -11,11 +12,15 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 public class ModeratorCommand implements CommandExecutor {
+
+    private Main plugin;
+    private ConfigFile locationFile;
+
+    public ModeratorCommand(Main plugin){
+        this.plugin = plugin;
+        this.locationFile = plugin.getLocationFile();
+    }
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
@@ -40,7 +45,7 @@ public class ModeratorCommand implements CommandExecutor {
 
                 StringBuilder message = new StringBuilder();
 
-                ConfigurationSection sec = LocationFile.getLocationFile().getConfigurationSection("Locations");
+                ConfigurationSection sec = locationFile.getConfig().getConfigurationSection("Locations");
                 for (String locationName : sec.getKeys(false)) {
                     message.append(locationName).append(", ");
                 }
@@ -50,8 +55,8 @@ public class ModeratorCommand implements CommandExecutor {
             } else if (args[0].equalsIgnoreCase("delWarp")) {
                 String input = args[1];
                 String warpName = input.substring(0, 1).toUpperCase() + input.substring(1).toLowerCase();
-                LocationFile.getLocationFile().set("Locations." + warpName, null);
-                LocationFile.save();
+                locationFile.getConfig().set("Locations." + warpName, null);
+                locationFile.saveFile();
                 // Kick player
             } else if (args[0].equalsIgnoreCase("kick")) { // KICK COMMAND
                 if (args.length == 1) {
@@ -108,7 +113,7 @@ public class ModeratorCommand implements CommandExecutor {
         return false;
     }
 
-    private static void createLocation(Player player, String locatieNaam) {
+    private void createLocation(Player player, String locatieNaam) {
         Location loc = player.getLocation();
         double x = loc.getX();
         double y = loc.getY();
@@ -117,7 +122,7 @@ public class ModeratorCommand implements CommandExecutor {
         double pitch = loc.getPitch();
         String worldName = loc.getWorld().getName();
 
-        if (!LocationFile.getLocationFile().contains("Locations." + locatieNaam)) {
+        if (!locationFile.getConfig().contains("Locations." + locatieNaam)) {
             zetLocatieInConfig(locatieNaam, x, y, z, yaw, pitch, worldName);
 
             player.sendMessage(locatieNaam + " set!");
@@ -126,17 +131,16 @@ public class ModeratorCommand implements CommandExecutor {
             player.sendMessage(locatieNaam + " set!");
         }
 
-
     }
 
-    private static void zetLocatieInConfig(String locatieNaam, double x, double y, double z, double yaw,
+    private void zetLocatieInConfig(String locatieNaam, double x, double y, double z, double yaw,
                                            double pitch, String worldName) {
-        LocationFile.getLocationFile().set("Locations." + locatieNaam + ".X", x);
-        LocationFile.getLocationFile().set("Locations." + locatieNaam + ".Y", y);
-        LocationFile.getLocationFile().set("Locations." + locatieNaam + ".Z", z);
-        LocationFile.getLocationFile().set("Locations." + locatieNaam + ".Yaw", yaw);
-        LocationFile.getLocationFile().set("Locations." + locatieNaam + ".Pitch", pitch);
-        LocationFile.getLocationFile().set("Locations." + locatieNaam + ".WorldName", worldName);
-        LocationFile.save();
+        locationFile.getConfig().set("Locations." + locatieNaam + ".X", x);
+        locationFile.getConfig().set("Locations." + locatieNaam + ".Y", y);
+        locationFile.getConfig().set("Locations." + locatieNaam + ".Z", z);
+        locationFile.getConfig().set("Locations." + locatieNaam + ".Yaw", yaw);
+        locationFile.getConfig().set("Locations." + locatieNaam + ".Pitch", pitch);
+        locationFile.getConfig().set("Locations." + locatieNaam + ".WorldName", worldName);
+        locationFile.saveFile();
     }
 }
